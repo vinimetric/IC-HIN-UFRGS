@@ -111,11 +111,10 @@ struct Gathered_Data{
     float mean_pt;
 };
 
-Gathered_Data DataGathering(float eta_gap, float HFSET_min, float HFSET_max, float centFluct, float ptr_min, float ptr_max, string correction, float corrFluct, vector<float> Xaxis_del, string trackSelec, float pvZ_cut){
+Gathered_Data DataGathering(float eta_gap, float HFSET_min, float HFSET_max, float centFluct, float ptr_min, float ptr_max, string correction, vector<float> Xaxis_del, string trackSelec, float pvZ_selec){
     // Open CMS OpenData 2.76 TeV 50-70% centrality ROOT file
     TFile *file(0);
     TFile *cFile(0);
-    //TString filename = "/home/allanfgodoi/Desktop/IC-HIN-UFRGS/CollectivityHIC/Data/HiForestAOD_DATA2011_MB_ppReReco_part2_03102024.root";
     TString filename = "/home/allanfgodoi/Desktop/IC-HIN-UFRGS/CollectivityHIC/Data/HiForestAOD_DATA2011_MB_ppReReco.root";
     TString cFilename = "/home/allanfgodoi/Desktop/IC-HIN-UFRGS/CollectivityHIC/Data/TrackCorrections_HIJING_538_OFFICIAL_Mar24.root";
 
@@ -211,8 +210,13 @@ Gathered_Data DataGathering(float eta_gap, float HFSET_min, float HFSET_max, flo
         // Filters made in the events
         if (HFsumET < (HFSET_min + centFluct*HFSET_min) || HFsumET > (HFSET_max + centFluct*HFSET_max)) // Applying centrality cut
             continue;
-        if (abs(pvZ) < pvZ_cut) // Applying |pvZ| cut (nominal: 15.0)
-            continue;
+        if (abs(pvZ_selec - 3.15f) < 0.001f){ // Little trick here to cut in 3-15 interval
+            if (abs(pvZ) < 3.0 || abs(pvZ) > 15.0) // Applying |pvZ| cut (nominal: 15.0)
+                continue;
+        } else{
+            if (abs(pvZ) > pvZ_selec) // Applying |pvZ| cut (nominal: 15.0)
+                continue;
+        }
 
         // Track loop
         for(int iTrk=0; iTrk<Ntrk; iTrk++){ // Loop over the tracks in a event
@@ -223,10 +227,7 @@ Gathered_Data DataGathering(float eta_gap, float HFSET_min, float HFSET_max, flo
                 abs(trkDxySig[iTrk]) < DxySig_cut && 
                 trkPtRes[iTrk] < PtRes_cut){
                     float corrFac;
-                    if (correction == "Correc"){
-                        corrFac = getTrkCorrWeightCached(trkPt[iTrk], trkEta[iTrk]);
-                        corrFac = corrFac + corrFluct*corrFac;
-                    }
+                    if (correction == "Correc") corrFac = getTrkCorrWeightCached(trkPt[iTrk], trkEta[iTrk]);
                     if (correction == "noCorrec") corrFac = 1.0;
                     if (trkPt[iTrk] >= ptr_min && trkPt[iTrk] <= ptr_max){ // ARRUMAR
                         Vec_trkPt_A.push_back(trkPt[iTrk]);
@@ -248,10 +249,7 @@ Gathered_Data DataGathering(float eta_gap, float HFSET_min, float HFSET_max, flo
                 abs(trkDxySig[iTrk]) < DxySig_cut && 
                 trkPtRes[iTrk] < PtRes_cut){
                     float corrFac;
-                    if (correction == "Correc"){
-                        corrFac = getTrkCorrWeightCached(trkPt[iTrk], trkEta[iTrk]);
-                        corrFac = corrFac + corrFluct*corrFac;
-                    }
+                    if (correction == "Correc") corrFac = getTrkCorrWeightCached(trkPt[iTrk], trkEta[iTrk]);
                     if (correction == "noCorrec") corrFac = 1.0;
                     if (trkPt[iTrk] >= ptr_min && trkPt[iTrk] <= ptr_max){ // ARRUMAR
                         Vec_trkPt_B.push_back(trkPt[iTrk]);
@@ -412,12 +410,12 @@ Gathered_Data DataGathering(float eta_gap, float HFSET_min, float HFSET_max, flo
 }
 
 // Thats the function we call to construct the observable
-void ObsConstructor(float Eta_gap, float HFSET_Min, float HFSET_Max, float CentFluct, float pTr_Min, float pTr_Max, string Correction, float CorrFluct, TString Name, TString Savename, string PlotType, string TrackSelec, float pvZ_Cut){
+void ObsConstructor(float Eta_gap, float HFSET_Min, float HFSET_Max, float CentFluct, float pTr_Min, float pTr_Max, string Correction, TString Name, TString Savename, string TrackSelec, float pvZ_Selec){
     int B = 100; // Number of Poisson bootstrap samples
     // Defining bins and plot's x axes
-    vector<float> Xaxis_del = {0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.6, 1.8, 1.98, 2.2, 2.38, 2.98, 3.18, 6.0, 8.04, 10.0}; // Those are the END of each bin, not the middle
+    vector<float> Xaxis_del = {0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.6, 1.8, 1.98, 2.2, 2.38, 2.98, 3.8, 4.5, 6.0, 8.0, 10.0}; // Those are the END of each bin, not the middle
     int nBins = (Xaxis_del.size()-1);
-    Gathered_Data gData = DataGathering(Eta_gap, HFSET_Min, HFSET_Max, CentFluct, pTr_Min, pTr_Max, Correction, CorrFluct, Xaxis_del, TrackSelec, pvZ_Cut);
+    Gathered_Data gData = DataGathering(Eta_gap, HFSET_Min, HFSET_Max, CentFluct, pTr_Min, pTr_Max, Correction, Xaxis_del, TrackSelec, pvZ_Selec);
     vector<float> pT_axis = gData.pT_axis;
     vector<float> vec_dPt_A = gData.vec_dPt_A;
     vector<float> vec_dPt_B = gData.vec_dPt_B;
@@ -545,59 +543,57 @@ void ObsConstructor(float Eta_gap, float HFSET_Min, float HFSET_Max, float CentF
     TParameter<float> *p_mean_pt = new TParameter<float>(mean_pt_name, mean_pt);
     p_mean_pt->Write(mean_pt_name, TObject::kOverwrite); // Does not depend on pT-ref (only eta-gap)
 
-    if (PlotType == "obs_ptref"){
-        vector<float> vec_zeros(nBins, 0.0);
+    vector<float> vec_zeros(nBins, 0.0);
 
-        // v0
-        float x_cent[1];
-        float y_v0[1];
-        float x_unc_zero[1];
-        float y_unc_v0[1];
-        x_unc_zero[0] = 0.0;
-        y_v0[0] = v0;
-        y_unc_v0[0] = unc_v0;
-        TString v0_name = "v0_";
-        if (HFSET_Max == 375.0){
-            v0_name += "55_";
-            x_cent[0] = 55.0;
-        }
-        if (HFSET_Max == 210.0){
-            v0_name += "65_";
-            x_cent[0] = 65.0;
-        }
-        v0_name += Name;
-        //TGraph* gr_v0 = new TGraph(1, x_cent, y_v0);
-        TGraphErrors* gr_v0 = new TGraphErrors(1, x_cent, y_v0, x_unc_zero, y_unc_v0);
-        gr_v0->SetName(v0_name);
-        gr_v0->Write();
-
-        // v0(pT)v0
-        vector<float> vec_v0ptv0_plot(nBins, 0.0);
-        vector<float> vec_unc_v0ptv0_plot(nBins, 0.0);
-        for (int i=0; i<nBins; i++){
-            vec_v0ptv0_plot[i] = 1e3*vec_v0ptv0[i];
-            vec_unc_v0ptv0_plot[i] = 1e3*vec_unc_v0ptv0[i];
-        }
-        TGraph* gr_v0ptv0_ptref = new TGraphErrors(nBins, pT_axis.data(), vec_v0ptv0_plot.data(), vec_zeros.data(), vec_unc_v0ptv0_plot.data());
-        TString v0ptv0_name = "v0ptv0_ptref_";
-        v0ptv0_name += Name + cent_name;
-        gr_v0ptv0_ptref->SetName(v0ptv0_name);
-        gr_v0ptv0_ptref->Write();
-
-        // v0(pT)
-        TGraphErrors* gr_v0pt = new TGraphErrors(nBins, pT_axis.data(), vec_v0pt.data(), vec_zeros.data(), vec_unc_v0pt.data());
-        TString v0pt_name = "v0pt_ptref_";
-        v0pt_name += Name + cent_name;
-        gr_v0pt->SetName(v0pt_name);
-        gr_v0pt->Write();
-
-        // v0(pT)/v0
-        TGraphErrors* gr_sv0pt = new TGraphErrors(nBins, pT_axis.data(), vec_sv0pt.data(), vec_zeros.data(), vec_unc_sv0pt.data());
-        TString sv0pt_name = "sv0pt_ptref_";
-        sv0pt_name += Name + cent_name;
-        gr_sv0pt->SetName(sv0pt_name);
-        gr_sv0pt->Write();
+    // v0
+    float x_cent[1];
+    float y_v0[1];
+    float x_unc_zero[1];
+    float y_unc_v0[1];
+    x_unc_zero[0] = 0.0;
+    y_v0[0] = v0;
+    y_unc_v0[0] = unc_v0;
+    TString v0_name = "v0_";
+    if (HFSET_Max == 375.0){
+        v0_name += "55_";
+        x_cent[0] = 55.0;
     }
+    if (HFSET_Max == 210.0){
+        v0_name += "65_";
+        x_cent[0] = 65.0;
+    }
+    v0_name += Name;
+    //TGraph* gr_v0 = new TGraph(1, x_cent, y_v0);
+    TGraphErrors* gr_v0 = new TGraphErrors(1, x_cent, y_v0, x_unc_zero, y_unc_v0);
+    gr_v0->SetName(v0_name);
+    gr_v0->Write();
+
+    // v0(pT)v0
+    vector<float> vec_v0ptv0_plot(nBins, 0.0);
+    vector<float> vec_unc_v0ptv0_plot(nBins, 0.0);
+    for (int i=0; i<nBins; i++){
+        vec_v0ptv0_plot[i] = 1e3*vec_v0ptv0[i];
+        vec_unc_v0ptv0_plot[i] = 1e3*vec_unc_v0ptv0[i];
+    }
+    TGraph* gr_v0ptv0_ptref = new TGraphErrors(nBins, pT_axis.data(), vec_v0ptv0_plot.data(), vec_zeros.data(), vec_unc_v0ptv0_plot.data());
+    TString v0ptv0_name = "v0ptv0_ptref_";
+    v0ptv0_name += Name + cent_name;
+    gr_v0ptv0_ptref->SetName(v0ptv0_name);
+    gr_v0ptv0_ptref->Write();
+
+    // v0(pT)
+    TGraphErrors* gr_v0pt = new TGraphErrors(nBins, pT_axis.data(), vec_v0pt.data(), vec_zeros.data(), vec_unc_v0pt.data());
+    TString v0pt_name = "v0pt_ptref_";
+    v0pt_name += Name + cent_name;
+    gr_v0pt->SetName(v0pt_name);
+    gr_v0pt->Write();
+
+    // v0(pT)/v0
+    TGraphErrors* gr_sv0pt = new TGraphErrors(nBins, pT_axis.data(), vec_sv0pt.data(), vec_zeros.data(), vec_unc_sv0pt.data());
+    TString sv0pt_name = "sv0pt_ptref_";
+    sv0pt_name += Name + cent_name;
+    gr_sv0pt->SetName(sv0pt_name);
+    gr_sv0pt->Write();
 
     cout << "mean_pt = " << mean_pt << endl;
     save_file->Close();
